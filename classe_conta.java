@@ -1,5 +1,7 @@
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class Conta {
     private String titular;
@@ -7,17 +9,16 @@ public class Conta {
     private String tipoConta;
     private int numeroConta;
     
- 
     private double saldo;
     private double limite;
     
     private String senha;
     private boolean contaAtivada;
     private int tentativasAcesso;
+    private final int MAX_TENTATIVAS = 3;
     
     private List<String> extrato;
     
-    // Construtor
     public Conta(String titular, String agencia, String tipoConta, int numeroConta, double saldo, double limite, String senha) {
         this.titular = titular;
         this.agencia = agencia;    
@@ -29,55 +30,50 @@ public class Conta {
         this.contaAtivada = true;
         this.tentativasAcesso = 0;
         
-        // Uso correto do operador diamante <>
         this.extrato = new ArrayList<>();
-        
-        registrarTransacao("Abertura de conta com saldo inicial de R$ " + String.format("%.2f", saldo));
+        registrarTransacao("Abertura de conta. Saldo inicial: R$ " + String.format("%.2f", saldo));
     }
     
-    // Registra a movimentacao na lista do extrato
     private void registrarTransacao(String mensagem) {
-        this.extrato.add(mensagem);
+        LocalDateTime agora = LocalDateTime.now();
+        DateTimeFormatter formato = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        this.extrato.add("[" + agora.format(formato) + "] " + mensagem);
     }
     
-    // Validaca de segurança
     public boolean validarSenha(String senhaInformada) {
         if (!contaAtivada) {
-            System.out.println("Conta bloqueada, procure um gerente.");
+            System.out.println("\n[ERRO] Esta conta encontra-se BLOQUEADA.");
             return false;
         }
         
         if (this.senha.equals(senhaInformada)) {
-            this.tentativasAcesso = 0; // Reseta as tentativas se acertar
+            this.tentativasAcesso = 0; 
             return true;
         } else {
             this.tentativasAcesso++;
-            if (tentativasAcesso >= 3) {
+            if (tentativasAcesso >= MAX_TENTATIVAS) {
                 this.contaAtivada = false;
-                System.out.println("Senha incorreta pela 3ª vez. Conta BLOQUEADA.");
+                System.out.println("\n[ALERTA] Senha incorreta pela " + MAX_TENTATIVAS + "ª vez. Conta BLOQUEADA por segurança.");
             } else {
-                // Espaçamento corrigido para a mensagem não ficar grudada
-                System.out.println("Senha incorreta. Tentativas: " + tentativasAcesso + " de 3 para bloquear.");
+                System.out.println("\n[AVISO] Senha incorreta! Tentativa " + tentativasAcesso + " de " + MAX_TENTATIVAS + ".");
             }
             return false;
         }
     }
 
-    // Operacoes Bancarias
-    
     public void depositar(double valor) {
         if (valor > 0) {
             this.saldo += valor;
-            registrarTransacao("Depósito: + R$ " + String.format("%.2f", valor));
-            System.out.println("Depósito realizado com sucesso!");
+            registrarTransacao("Depósito recebido: + R$ " + String.format("%.2f", valor));
+            System.out.println("\nDepósito de R$ " + String.format("%.2f", valor) + " realizado com sucesso!");
         } else {
-            System.out.println("Valor de depósito inválido.");
+            System.out.println("\n[ERRO] Valor de depósito deve ser maior que zero.");
         }
     }
 
     public boolean sacar(double valor) {
         if (valor <= 0) {
-            System.out.println("Valor de saque inválido.");
+            System.out.println("\n[ERRO] Valor de saque inválido.");
             return false;
         }
         
@@ -85,18 +81,26 @@ public class Conta {
         
         if (valor <= saldoDisponivel) {
             this.saldo -= valor;
-            registrarTransacao("Saque: - R$ " + String.format("%.2f", valor));
-            System.out.println("Saque realizado. Retire seu dinheiro.");
+            registrarTransacao("Saque efetuado:   - R$ " + String.format("%.2f", valor));
+            System.out.println("\nSaque autorizado. Por favor, retire seu dinheiro.");
             return true;
         } else {
-            System.out.println("Saldo e limite insuficientes para este saque.");
+            System.out.println("\n[ERRO] Saldo e limite insuficientes para este saque.");
             return false;
         }
     }
 
     public boolean transferir(Conta contaDestino, double valor) {
+        if (contaDestino == null) {
+            System.out.println("\n[ERRO] Conta de destino não encontrada.");
+            return false;
+        }
+        if (this == contaDestino) {
+            System.out.println("\n[ERRO] Você não pode transferir dinheiro para a própria conta.");
+            return false;
+        }
         if (valor <= 0) {
-            System.out.println("Valor inválido para transferência.");
+            System.out.println("\n[ERRO] Valor inválido para transferência.");
             return false;
         }
 
@@ -104,48 +108,34 @@ public class Conta {
 
         if (valor <= saldoDisponivel) {
             this.saldo -= valor;
-            this.registrarTransacao("Transferência enviada para " + contaDestino.getTitular() + ": - R$ " + String.format("%.2f", valor));
+            this.registrarTransacao("PIX enviado para " + contaDestino.getTitular() + ": - R$ " + String.format("%.2f", valor));
             
             contaDestino.saldo += valor;
-            contaDestino.registrarTransacao("Transferência recebida de " + this.titular + ": + R$ " + String.format("%.2f", valor));
+            contaDestino.registrarTransacao("PIX recebido de " + this.titular + ": + R$ " + String.format("%.2f", valor));
 
-            System.out.println("Transferência realizada com sucesso!");
+            System.out.println("\nTransferência de R$ " + String.format("%.2f", valor) + " para " + contaDestino.getTitular() + " realizada!");
             return true;
         } else {
-            System.out.println("Saldo insuficiente para realizar a transferência.");
+            System.out.println("\n[ERRO] Saldo insuficiente para realizar a transferência.");
             return false;
         }
     }
 
     public void exibirExtrato() {
-        System.out.println("\n=== EXTRATO BANCÁRIO ===");
+        System.out.println("\n================ EXTRATO BANCÁRIO ================");
         System.out.println("Titular: " + this.titular + " | Ag: " + this.agencia + " | CC: " + this.numeroConta);
-        System.out.println("------------------------");
+        System.out.println("--------------------------------------------------");
         for (String transacao : this.extrato) {
             System.out.println(transacao);
         }
-        System.out.println("------------------------");
+        System.out.println("--------------------------------------------------");
         System.out.println("Saldo Atual: R$ " + String.format("%.2f", this.saldo));
-        System.out.println("Limite Disponível: R$ " + String.format("%.2f", this.limite));
-        System.out.println("========================\n");
+        System.out.println("Limite Disp: R$ " + String.format("%.2f", this.limite));
+        System.out.println("==================================================\n");
     }
     
-    // GETTERS 
-    
-    
-    public double getSaldo() {
-        return saldo;
-    }
-    
-    public double getLimite() {
-        return limite;
-    }
-    
-    public String getTitular() {
-        return titular;
-    }
-    
-    public String getTipoconta() {
-        return tipoConta;
-    }
+    public double getSaldo() { return saldo; }
+    public double getLimite() { return limite; }
+    public String getTitular() { return titular; }
+    public boolean isContaAtivada() { return contaAtivada; }
 }
